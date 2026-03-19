@@ -1,21 +1,32 @@
-import numpy as np
+import logging
 import pickle
+import numpy as np
 
-# Load model once
-model = pickle.load(open("model/svm_model.pkl", "rb"))
-scaler = pickle.load(open("model/scaler.pkl", "rb"))
+logger = logging.getLogger("wine-svm-api.model")
 
-def predict_wine(features):
+model = pickle.load(open("../svm_model.pkl", "rb"))
+scaler = pickle.load(open("../scaler.pkl", "rb"))
+
+def predict_wine(features: list[float]):
+    logger.debug("Original features: %s", features)
+    data = np.array(features).reshape(1, -1)
+
     try:
-        data = np.array(features).reshape(1, -1)
-        data = scaler.transform(data)
-
-        pred = model.predict(data)
-        prob = model.predict_proba(data)
-
-        return {
-            "prediction": int(pred[0]),
-            "confidence": float(max(prob[0]))
-        }
+        data_scaled = scaler.transform(data)
     except Exception as e:
-        return {"error": str(e)}
+        logger.exception("Scaler transform failed")
+        raise
+
+    try:
+        prediction = model.predict(data_scaled)
+        probabilities = model.predict_proba(data_scaled)
+    except Exception as e:
+        logger.exception("Model prediction failed")
+        raise
+
+    result = {
+        "prediction": int(prediction[0]),
+        "probabilities": probabilities[0].tolist(),
+    }
+    logger.info("predict_wine result: %s", result)
+    return result
